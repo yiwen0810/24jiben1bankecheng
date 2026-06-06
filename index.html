@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>课程表+考试倒计时</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    body{background:#f2f3f7;padding:20px}
+    .wrap{max-width:850px;margin:0 auto}
+    /*头部标题栏*/
+    .header{
+      background: linear-gradient(90deg,#5578ee,#8254d8);
+      color:#fff;
+      padding:24px;
+      border-radius:16px;
+      text-align:center;
+      box-shadow:0 4px 12px #00000015;
+    }
+    .header h2{margin-bottom:8px}
+    .count-box{display:flex;gap:20px;justify-content:center;margin-top:12px}
+    .count-item{background:rgba(255,255,255,0.2);padding:6px 16px;border-radius:20px}
+    /*标签导航*/
+    .tab-nav{display:flex;margin:20px 0;gap:6px}
+    .tab-item{
+      flex:1;
+      padding:12px;
+      border-radius:10px;
+      border:none;
+      font-size:15px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .tab-item.active{background:#5578ee;color:#fff}
+    /*页面容器，默认隐藏*/
+    .page{display:none;background:#fff;border-radius:12px;padding:20px}
+    .page.active{display:block}
+    /*按钮区*/
+    .btn-group{display:flex;justify-content:space-between;margin-bottom:16px}
+    .btn{padding:8px 16px;border:none;border-radius:6px;color:#fff;cursor:pointer}
+    .btn-blue{background:#5578ee}
+    .btn-red{background:#ed4343}
+    .btn-green{background:#32bc72}
+    /*课程列表项*/
+    .course-item{
+      padding:12px;
+      border-bottom:1px solid #eee;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .course-info{line-height:1.6}
+    .opt-btn{padding:5px 10px;border:none;border-radius:4px;color:#fff;margin:0 3px;cursor:pointer}
+    .edit{background:#5578ee}
+    .del{background:#ed4343}
+    /*弹窗遮罩*/
+    .mask{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;
+    }
+    .dialog{
+      background:#fff;padding:22px;border-radius:10px;width:420px;
+    }
+    .dialog input{
+      width:100%;margin:8px 0;padding:8px;border:1px solid #ddd;border-radius:4px
+    }
+    /*课表样式沿用之前*/
+    table {
+      width:100%;border-collapse:collapse;
+    }
+    th,td{border:1px solid #ddd;padding:12px;min-height:60px;text-align:center}
+    th{background:#5578ee;color:#fff}
+    .course{background:#e8f0ff;color:#1959cc;padding:4px;border-radius:4px;font-weight:bold}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <!--顶部头部-->
+  <div class="header">
+    <h2>📚课程表 + 考试倒计时</h2>
+    <div>课程管理·考试管理·智能倒计时提醒</div>
+    <div class="count-box">
+      <div class="count-item">📖课程: <span id="courseNum">0</span></div>
+      <div class="count-item">📝考试: <span id="examNum">0</span></div>
+    </div>
+  </div>
+  <!--标签导航-->
+  <div class="tab-nav">
+    <button class="tab-item" data-page="page1">📅周课表</button>
+    <button class="tab-item active" data-page="page2">📋课程管理</button>
+    <button class="tab-item" data-page="page3">✏️考试管理</button>
+    <button class="tab-item" data-page="page4">🏠考试仪表盘</button>
+  </div>
+
+  <!--页面1：周课表-->
+  <div class="page" id="page1">
+    <table id="scheduleTable">
+      <thead>
+        <tr>
+          <th>节次</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>周六</th><th>周日</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>2</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr><td>4</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!--页面2：课程管理（当前选中）-->
+  <div class="page active" id="page2">
+    <div class="btn-group">
+      <button class="btn btn-blue" id="addCourseBtn">➕添加课程</button>
+      <div>
+        <button class="btn btn-green" id="exportBtn">💾导出数据</button>
+        <button class="btn btn-red" id="importBtn">📥导入数据</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none">
+      </div>
+    </div>
+    <div id="courseList"></div>
+  </div>
+
+  <!--页面3：考试管理-->
+  <div class="page" id="page3">
+    <button class="btn btn-blue" id="addExamBtn">➕添加考试</button>
+    <div id="examList" style="margin-top:15px"></div>
+  </div>
+
+  <!--页面4：考试仪表盘（倒计时）-->
+  <div class="page" id="page4">
+    <h3>考试倒计时看板</h3>
+    <div id="countDownBox" style="margin-top:15px"></div>
+  </div>
+
+  <!--新增/编辑课程弹窗-->
+  <div class="mask" id="courseMask">
+    <div class="dialog">
+      <h3 id="dialogTitle">添加课程</h3>
+      <input type="hidden" id="editId">
+      <input placeholder="课程名称" id="cName">
+      <input placeholder="星期(1=周一~7=周日)" id="cDay">
+      <input placeholder="开始节次" id="cStart">
+      <input placeholder="结束节次" id="cEnd">
+      <input placeholder="授课老师" id="cTeacher">
+      <input placeholder="上课教室" id="cRoom">
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-blue" id="saveCourse">保存</button>
+        <button class="btn btn-red" id="closeCourseMask">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!--新增考试弹窗-->
+  <div class="mask" id="examMask">
+    <div class="dialog">
+      <h3>添加考试</h3>
+      <input placeholder="考试科目名称" id="eName">
+      <input placeholder="考试日期 例:2025-07-01" id="eDate">
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn btn-blue" id="saveExam">保存</button>
+        <button class="btn btn-red" id="closeExamMask">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== 数据初始化，从本地存储读取 ==========
+let courseData = JSON.parse(localStorage.getItem('courseArr')) || [
+  {id:1,day:1,start:1,end:2,name:"软件工程",teacher:"张老师",room:"教学楼A101"},
+  {id:2,day:2,start:3,end:4,name:"数据库原理",teacher:"李老师",room:"教学楼B202"},
+  {id:3,day:3,start:1,end:3,name:"Web开发",teacher:"王老师",room:"实验楼C303"},
+  {id:4,day:4,start:2,end:3,name:"计算机网络",teacher:"赵老师",room:"教学楼D404"},
+  {id:5,day:5,start:1,end:2,name:"算法设计",teacher:"孙老师",room:"教学楼A205"},
+];
+let examData = JSON.parse(localStorage.getItem('examArr')) || [];
+const dayText = ['','周一','周二','周三','周四','周五','周六','周日'];
+
+// ========== 标签页切换 ==========
+document.querySelectorAll('.tab-item').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.tab-item').forEach(i=>i.classList.remove('active'))
+    tab.classList.add('active')
+    let target = tab.dataset.page
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+    document.getElementById(target).classList.add('active')
+  }
+})
+
+// ========== 保存数据到本地缓存 ==========
+function saveStorage(){
+  localStorage.setItem('courseArr',JSON.stringify(courseData))
+  localStorage.setItem('examArr',JSON.stringify(examData))
+  renderAll()
+}
+
+// ========== 全局渲染（课表+课程列表+考试+统计） ==========
+function renderAll(){
+  //更新顶部统计数字
+  document.getElementById('courseNum').innerText = courseData.length
+  document.getElementById('examNum').innerText = examData.length
+  renderTable()
+  renderCourseList()
+  renderExamList()
+  renderCountDown()
+}
+
+//1.渲染课表
+function renderTable(){
+  const table = document.getElementById('scheduleTable')
+  //清空原有单元格内容
+  for(let r=1;r<=4;r++){
+    for(let c=1;c<=7;c++){
+      table.rows[r].cells[c].innerHTML = ''
+      table.rows[r].cells[c].style.display = ''
+      table.rows[r].cells[c].rowSpan = 1
+    }
+  }
+  courseData.forEach(item=>{
+    for(let i=item.start;i<=item.end;i++){
+      let cell = table.rows[i].cells[item.day]
+      if(i===item.start){
+        cell.innerHTML = `<div class="course">${item.name}<br>${item.room}</div>`
+      }
+      if(i<item.end){
+        cell.rowSpan = item.end-item.start+1
+      }else{
+        table.rows[i].cells[item.day].style.display = 'none'
+      }
+    }
+  })
+}
+
+//2.渲染课程管理列表
+function renderCourseList(){
+  let wrap = document.getElementById('courseList')
+  wrap.innerHTML = ''
+  courseData.forEach(item=>{
+    let html = `
+    <div class="course-item">
+      <div class="course-info">
+        <div><b>${item.name}</b></div>
+        <div>${dayText[item.day]} 第${item.start}-${item.end}节 | ${item.teacher} | ${item.room}</div>
+      </div>
+      <div>
+        <button class="opt-btn edit" data-id="${item.id}">编辑</button>
+        <button class="opt-btn del" data-id="${item.id}">删除</button>
+      </div>
+    </div>`
+    wrap.innerHTML += html
+  })
+  //绑定编辑删除事件
+  document.querySelectorAll('.edit').forEach(btn=>{
+    btn.onclick = ()=> openEditCourse(+btn.dataset.id)
+  })
+  document.querySelectorAll('.del').forEach(btn=>{
+    btn.onclick = ()=>{
+      courseData = courseData.filter(i=>i.id!==+btn.dataset.id)
+      saveStorage()
+    }
+  })
+}
+
+// ========== 课程新增/编辑弹窗逻辑 ==========
+const courseMask = document.getElementById('courseMask')
+const cName = document.getElementById('cName')
+const cDay = document.getElementById('cDay')
+const cStart = document.getElementById('cStart')
+const cEnd = document.getElementById('cEnd')
+const cTeacher = document.getElementById('cTeacher')
+const cRoom = document.getElementById('cRoom')
+const editId = document.getElementById('editId')
+const dialogTitle = document.getElementById('dialogTitle')
+
+//打开新增
+document.getElementById('addCourseBtn').onclick = ()=>{
+  dialogTitle.innerText = '添加课程'
+  editId.value = ''
+  //清空输入框
+  ;[cName,cDay,cStart,cEnd,cTeacher,cRoom].forEach(i=>i.value='')
+  courseMask.style.display = 'flex'
+}
+//打开编辑
+function openEditCourse(id){
+  dialogTitle.innerText = '编辑课程'
+  let info = courseData.find(i=>i.id===id)
+  editId.value = id
+  cName.value = info.name
+  cDay.value = info.day
+  cStart.value = info.start
+  cEnd.value = info.end
+  cTeacher.value = info.teacher
+  cRoom.value = info.room
+  courseMask.style.display = 'flex'
+}
+//关闭弹窗
+document.getElementById('closeCourseMask').onclick = ()=>courseMask.style.display='none'
+//保存课程
+document.getElementById('saveCourse').onclick = ()=>{
+  let obj = {
+    name:cName.value.trim(),
+    day:+cDay.value,
+    start:+cStart.value,
+    end:+cEnd.value,
+    teacher:cTeacher.value.trim(),
+    room:cRoom.value.trim()
+  }
+  if(!obj.name){alert('课程名不能为空');return}
+  if(editId.value){
+    //编辑
+    let idx = courseData.findIndex(i=>i.id===+editId.value)
+    obj.id = +editId.value
+    courseData[idx] = obj
+  }else{
+    //新增，生成唯一ID
+    obj.id = Date.now()
+    courseData.push(obj)
+  }
+  courseMask.style.display = 'none'
+  saveStorage()
+}
+
+// ========== 导入导出JSON ==========
+//导出
+document.getElementById('exportBtn').onclick = ()=>{
+  let json = JSON.stringify(courseData,null,2)
+  let blob = new Blob([json],{type:'application/json'})
+  let a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = '课程数据.json'
+  a.click()
+}
+//导入
+document.getElementById('importBtn').onclick = ()=> document.getElementById('fileInput').click()
+document.getElementById('fileInput').onchange = function(e){
+  let file = e.target.files[0]
+  let fr = new FileReader()
+  fr.onload = res=>{
+    try{
+      let arr = JSON.parse(res.target.result)
+      courseData = arr
+      saveStorage()
+      alert('导入成功')
+    }catch{alert('文件格式错误')}
+  }
+  fr.readAsText(file)
+}
+
+// ========== 考试模块 ==========
+const examMask = document.getElementById('examMask')
+const eName = document.getElementById('eName')
+const eDate = document.getElementById('eDate')
+document.getElementById('addExamBtn').onclick = ()=>{
+  ;[eName,eDate].forEach(i=>i.value='')
+  examMask.style.display = 'flex'
+}
+document.getElementById('closeExamMask').onclick = ()=>examMask.style.display='none'
+//保存考试
+document.getElementById('saveExam').onclick = ()=>{
+  examData.push({id:Date.now(),name:eName.value,date:eDate.value})
+  examMask.style.display = 'none'
+  saveStorage()
+}
+//渲染考试列表
+function renderExamList(){
+  let wrap = document.getElementById('examList')
+  wrap.innerHTML = ''
+  examData.forEach(item=>{
+    wrap.innerHTML += `<div style="padding:8px;border-bottom:1px solid #eee;display:flex;justify-content:space-between">
+    <span>${item.name} | ${item.date}</span>
+    <button class="opt-btn del" data-examid="${item.id}">删除</button>
+    </div>`
+  })
+  document.querySelectorAll('.del').forEach(btn=>{
+    btn.onclick = ()=>{
+      examData = examData.filter(i=>i.id!==+btn.dataset.examid)
+      saveStorage()
+    }
+  })
+}
+//考试倒计时仪表盘
+function renderCountDown(){
+  let box = document.getElementById('countDownBox')
+  box.innerHTML = ''
+  let now = new Date()
+  examData.forEach(item=>{
+    let target = new Date(item.date)
+    let diff = Math.floor((target - now)/(1000*60*60*24))
+    let tip = diff>0 ? `剩余${diff}天` : diff===0 ? '今日考试！' : '已考完'
+    box.innerHTML += `<div style="padding:10px;background:#f6f8ff;border-radius:8px;margin:6px 0">
+    <b>${item.name}</b>：${item.date} → ${tip}
+    </div>`
+  })
+}
+
+//页面加载自动渲染
+renderAll()
+</script>
+</body>
+</html>
